@@ -1,0 +1,15 @@
+# Visual Studio
+.vs/
+bin/
+obj/
+*.user
+*.VC.db
+*.VC.opendb
+*.ipch
+
+# DxLib 本体（各自でダウンロードして配置）
+DxLib/
+
+# セーブデータ・設定（実行時に生成）
+ArsGladii/save/
+save/

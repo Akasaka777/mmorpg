@@ -1,0 +1,11 @@
+# このファイルを Assets/Models/player/model.cfg にコピーし、モデルを同じフォルダに置いてください。
+file=Character.fbx
+scale=1.0
+rot_y=180
+y_offset=0
+anim_fps=30
+idle=0
+move=1
+attack=2
+hit=3
+death=4
