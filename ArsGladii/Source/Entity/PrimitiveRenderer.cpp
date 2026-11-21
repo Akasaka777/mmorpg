@@ -154,6 +154,15 @@ void PrimitiveRenderer::DrawHumanoid(const PrimitiveLook& look, const PrimitiveP
         lPitch = 0.9f;
         lSide = -0.6f;
         break;
+    case AnimState::Guard:
+        // 盾（左腕）を前に構え、武器を体の前に引きつける
+        lPitch = 1.45f;
+        lSide = 0.25f;
+        rPitch = 1.1f;
+        rSide = -0.35f;
+        lean = -4.0f;
+        bob = std::sin(t * 3.0f) * 1.0f;
+        break;
     case AnimState::Hit:
         lean = -14.0f * (1.0f - p);
         rPitch = 0.9f;

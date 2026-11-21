@@ -12,7 +12,10 @@ public:
     virtual ~Character() = default;
 
     // 被ダメージ。回避中などで無効化された場合は amount=0 を返す。
-    virtual DamageResult TakeDamage(const DamageResult& dmg);
+    // attacker: 攻撃してきたキャラ（ガード・パリィの向き判定に使う）
+    virtual DamageResult TakeDamage(const DamageResult& dmg, Character* attacker = nullptr);
+    // パリィされたときに呼ばれる
+    virtual void OnParried() {}
 
     bool IsDead() const { return hp <= 0; }
     float HpRate() const { return stats.maxHP > 0 ? static_cast<float>(hp) / stats.maxHP : 0.0f; }

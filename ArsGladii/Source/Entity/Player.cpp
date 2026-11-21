@@ -20,6 +20,13 @@ constexpr float kDodgeCooldown = 0.8f;
 constexpr float kDodgeInvuln = 0.30f;
 constexpr float kTurnSpeed = 14.0f;
 constexpr float kComboWindow = 0.6f;
+constexpr float kJumpVelocity = 650.0f;
+constexpr float kGravity = 1800.0f;
+constexpr float kParryWindow = 0.25f;   // 左クリック後、この時間内に攻撃を受けるとパリィ
+constexpr float kParryCooldown = 0.6f;  // 失敗時の再受付待ち
+constexpr float kCounterTime = 2.0f;    // パリィ成功後の与ダメージ 1.5 倍の時間
+constexpr float kGuardMoveScale = 0.4f;
+constexpr float kGuardFrontHalfAngle = 1.75f; // 正面 ±100 度をガード可能
 }
 
 Player::Player()
@@ -75,10 +82,12 @@ void Player::FillDefaultSkillSlots()
 void Player::Respawn(const VECTOR& p)
 {
     pos = p;
+    pos.y = 0.0f;
+    vy_ = 0.0f;
     yaw = 0.0f;
+    parryTimer_ = parryCd_ = counterTimer_ = 0.0f;
     action_ = Action::Free;
     activeSkill_ = nullptr;
-    hp = std::max(hp, stats.maxHP);
     hp = stats.maxHP;
     mp = stats.maxMP;
     anim.Play(AnimState::Idle, 0.0f, true);
@@ -248,10 +257,43 @@ void Player::WearEquipment(EquipSlot slot, int amount)
 // ---------------------------------------------------------------------------
 // 戦闘
 
-DamageResult Player::TakeDamage(const DamageResult& dmg)
+DamageResult Player::TakeDamage(const DamageResult& dmg, Character* attacker)
 {
     if (IsDead() || invulnTimer_ > 0.0f) return DamageResult{};
-    DamageResult r = Character::TakeDamage(dmg);
+
+    // ガード・パリィは正面からの攻撃のみ
+    bool fromFront = true;
+    if (attacker) {
+        const float ang = std::atan2(attacker->pos.x - pos.x, attacker->pos.z - pos.z);
+        fromFront = std::fabs(WrapAngle(ang - yaw)) <= kGuardFrontHalfAngle;
+    }
+    if (action_ == Action::Guard && fromFront) {
+        if (parryTimer_ > 0.0f) {
+            DamageResult parried;
+            parried.parried = true;
+            parryTimer_ = 0.0f;
+            parryCd_ = 0.0f;
+            counterTimer_ = kCounterTime;
+            invulnTimer_ = 0.3f;
+            SoundManager::Get().PlaySE("parry");
+            return parried;
+        }
+        DamageResult guarded = dmg;
+        const bool shield = equipment.Has(EquipSlot::Shield) && !equipment.IsShieldDisabled();
+        guarded.amount = std::max(1, static_cast<int>(std::lround(dmg.amount * (shield ? 0.15f : 0.30f))));
+        guarded.critical = false;
+        guarded.guarded = true;
+        Character::TakeDamage(guarded, attacker);
+        WearEquipment(shield ? EquipSlot::Shield : EquipSlot::Weapon, 1);
+        SoundManager::Get().PlaySE("guard");
+        if (IsDead()) {
+            action_ = Action::Dead;
+            anim.Play(AnimState::Death, 1.4f, true);
+        }
+        return guarded;
+    }
+
+    DamageResult r = Character::TakeDamage(dmg, attacker);
 
     // 防具の耐久値を減らす（装備中の防具からランダムに1つ）
     EquipSlot armor[3];
@@ -356,6 +398,19 @@ void Player::Update(float dt, const Camera& cam, World& world, EventSink& events
     for (auto& cd : cooldowns) cd.second = std::max(0.0f, cd.second - dt);
     dodgeCd_ = std::max(0.0f, dodgeCd_ - dt);
     invulnTimer_ = std::max(0.0f, invulnTimer_ - dt);
+    counterTimer_ = std::max(0.0f, counterTimer_ - dt);
+    parryCd_ = std::max(0.0f, parryCd_ - dt);
+    if (parryTimer_ > 0.0f) {
+        parryTimer_ -= dt;
+        if (parryTimer_ <= 0.0f) { parryTimer_ = 0.0f; parryCd_ = kParryCooldown; } // 空振り
+    }
+
+    // 重力・ジャンプ
+    if (pos.y > 0.0f || vy_ != 0.0f) {
+        vy_ -= kGravity * dt;
+        pos.y += vy_ * dt;
+        if (pos.y <= 0.0f) { pos.y = 0.0f; vy_ = 0.0f; }
+    }
     bool buffChanged = false;
     if (atkBuffTime > 0.0f) { atkBuffTime -= dt; if (atkBuffTime <= 0.0f) { atkBuffTime = 0.0f; buffChanged = true; } }
     if (defBuffTime > 0.0f) { defBuffTime -= dt; if (defBuffTime <= 0.0f) { defBuffTime = 0.0f; buffChanged = true; } }
@@ -374,15 +429,26 @@ void Player::Update(float dt, const Camera& cam, World& world, EventSink& events
     const bool attackPressed = inputEnabled && in.MousePressed(MouseButton::Left);
 
     // スキル入力（Free / 通常攻撃中ならキャンセルして発動）
-    if (inputEnabled && (action_ == Action::Free || action_ == Action::Attack)) {
+    if (inputEnabled && (action_ == Action::Free || action_ == Action::Attack || action_ == Action::Guard)) {
         const ag::Action keys[kSkillSlotCount] = { ag::Action::Skill1, ag::Action::Skill2, ag::Action::Skill3, ag::Action::Skill4 };
         for (int i = 0; i < kSkillSlotCount; ++i) {
             if (in.ActionPressed(keys[i]) && TryStartSkill(i, world, events)) break;
         }
     }
+    // ジャンプ
+    if (inputEnabled && in.ActionPressed(ag::Action::Jump) && !IsAirborne() && action_ == Action::Free) {
+        vy_ = kJumpVelocity;
+        SoundManager::Get().PlaySE("jump");
+    }
+    // ガード（右長押し）
+    if (inputEnabled && in.MouseDown(MouseButton::Right) && action_ == Action::Free && !IsAirborne()) {
+        action_ = Action::Guard;
+        actionTimer_ = 0.0f;
+        anim.Play(AnimState::Guard, 0.0f, true);
+    }
     // 回避
-    if (inputEnabled && in.ActionPressed(ag::Action::Dodge) && dodgeCd_ <= 0.0f
-        && (action_ == Action::Free || action_ == Action::Attack || action_ == Action::Stagger)) {
+    if (inputEnabled && in.ActionPressed(ag::Action::Dodge) && dodgeCd_ <= 0.0f && !IsAirborne()
+        && (action_ == Action::Free || action_ == Action::Attack || action_ == Action::Stagger || action_ == Action::Guard)) {
         VECTOR dir = VGet(0, 0, 0);
         if (in.ActionDown(ag::Action::MoveForward)) dir = VAdd(dir, cam.ForwardXZ());
         if (in.ActionDown(ag::Action::MoveBack))    dir = VSub(dir, cam.ForwardXZ());
@@ -459,6 +525,22 @@ void Player::Update(float dt, const Camera& cam, World& world, EventSink& events
         if (actionTimer_ >= kDodgeDuration) action_ = Action::Free;
         break;
     }
+
+    case Action::Guard:
+        if (!inputEnabled || !in.MouseDown(MouseButton::Right)) {
+            action_ = Action::Free;
+            parryTimer_ = 0.0f;
+            break;
+        }
+        // 構えたまま視点の方向を向き、ゆっくり移動
+        yaw = ApproachAngle(yaw, cam.Yaw(), kTurnSpeed * dt);
+        HandleMovement(dt, cam, world, inputEnabled, kGuardMoveScale);
+        anim.Play(AnimState::Guard);
+        if (attackPressed && parryTimer_ <= 0.0f && parryCd_ <= 0.0f) {
+            parryTimer_ = kParryWindow;
+            SoundManager::Get().PlaySE("parry_ready");
+        }
+        break;
 
     case Action::Stagger:
         if (actionTimer_ >= 0.3f) action_ = Action::Free;

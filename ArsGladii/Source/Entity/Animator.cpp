@@ -17,6 +17,7 @@ float DefaultDuration(AnimState s)
     case AnimState::Skill:  return 0.8f;
     case AnimState::Hit:    return 0.35f;
     case AnimState::Death:  return 1.2f;
+    case AnimState::Guard:  return 1.0f;
     default:                return 1.0f;
     }
 }
@@ -69,6 +70,7 @@ int Animator::AttachClip(AnimState state, float& outTotal)
     if (!def_) return -1;
     const AnimClipRef* clip = &def_->clips[static_cast<int>(state)];
     if (!clip->Valid() && state == AnimState::Skill) clip = &def_->clips[static_cast<int>(AnimState::Attack)];
+    if (!clip->Valid() && state == AnimState::Guard) clip = &def_->clips[static_cast<int>(AnimState::Idle)];
     if (!clip->Valid()) clip = &def_->clips[static_cast<int>(AnimState::Idle)];
     if (!clip->Valid()) return -1;
     int a = MV1AttachAnim(model_, clip->index, clip->srcHandle, FALSE);

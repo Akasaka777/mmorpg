@@ -34,6 +34,8 @@ struct StatBonus {
 struct DamageResult {
     int  amount = 0;
     bool critical = false;
+    bool guarded = false;  // ガードで軽減された
+    bool parried = false;  // パリィ成功（ダメージ 0）
 };
 
 // 基本ダメージ式:

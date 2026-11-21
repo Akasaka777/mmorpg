@@ -3,6 +3,7 @@
 #include "Config.h"
 #include "MathUtil.h"
 #include "Random.h"
+#include "DxLib.h"
 
 namespace ag {
 
@@ -25,11 +26,14 @@ void Camera::Reset(const VECTOR& target, float yaw)
 
 void Camera::HandleInput(bool allowRotate)
 {
+    // マウスを動かすだけで視点移動（カーソルは非表示・画面中央に固定）。
+    // Alt を押している間・ウィンドウが非アクティブの間はカーソルを解放する。
     Input& in = Input::Get();
-    const bool rotating = allowRotate && in.MouseDown(MouseButton::Right);
+    const bool freeCursor = in.KeyDown(KEY_INPUT_LALT) || in.KeyDown(KEY_INPUT_RALT) || GetWindowActiveFlag() == FALSE;
+    const bool rotating = allowRotate && !freeCursor;
     in.SetMouseCaptured(rotating);
     if (rotating) {
-        const float sens = 0.0035f * Settings().mouseSensitivity;
+        const float sens = 0.0030f * Settings().mouseSensitivity;
         yaw_ = WrapAngle(yaw_ + in.MouseDX() * sens);
         const float dy = in.MouseDY() * sens * (Settings().invertY ? 1.0f : -1.0f);
         pitch_ = Clamp(pitch_ + dy, kMinPitch, kMaxPitch);

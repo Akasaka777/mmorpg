@@ -83,12 +83,12 @@ bool Slider(int x, int y, int w, const std::string& label, float& value, float m
     Input& in = Input::Get();
     const FontManager& fm = FontManager::Get();
     fm.Draw(x, y, label, TextColor());
-    const int bx = x + 300, by = y + 10, bw = w - 420;
+    const int bx = x + 260, by = y + 10, bw = w - 380;
     DrawBox(bx, by, bx + bw, by + 6, GetColor(50, 50, 60), TRUE);
     const float t = (value - minV) / (maxV - minV);
     DrawBox(bx, by, bx + static_cast<int>(bw * t), by + 6, Gold(), TRUE);
     DrawCircle(bx + static_cast<int>(bw * t), by + 3, 10, Gold(), TRUE);
-    fm.Draw(bx + bw + 30, y, Format(fmt, value), TextColor());
+    fm.Draw(bx + bw + 24, y, Format(fmt, value), TextColor());
     if (in.MouseDown(MouseButton::Left) && MouseIn(bx - 10, by - 14, bw + 20, 34)) {
         const float nt = Clamp(static_cast<float>(in.MouseX() - bx) / bw, 0.0f, 1.0f);
         const float nv = minV + (maxV - minV) * nt;
@@ -104,7 +104,7 @@ bool Slider(int x, int y, int w, const std::string& label, float& value, float m
 bool Toggle(int x, int y, const std::string& label, bool& value)
 {
     FontManager::Get().Draw(x, y, label, TextColor());
-    if (Button(x + 300, y - 4, 140, 34, value ? "ON" : "OFF", value)) {
+    if (Button(x + 260, y - 4, 140, 34, value ? "ON" : "OFF", value)) {
         value = !value;
         return true;
     }

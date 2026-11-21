@@ -127,7 +127,7 @@ int World::PlayerAttack(Player& player, float range, float halfArc, float multip
     for (auto& e : enemies_) {
         if (e->IsDead()) continue;
         if (!InArc(player.pos, player.yaw, e->pos, range, halfArc, e->radius)) continue;
-        const DamageResult dmg = CalcDamage(player.stats, e->stats, multiplier, extraCrit);
+        const DamageResult dmg = CalcDamage(player.stats, e->stats, multiplier * player.AttackMultiplier(), extraCrit);
         const DamageResult applied = e->TakeDamage(dmg);
         if (applied.amount <= 0) continue;
         ++hits;

@@ -6,7 +6,8 @@ namespace ag {
 constexpr int kScreenWidth = 1920;
 constexpr int kScreenHeight = 1080;
 constexpr const char* kGameTitle = "Ars Gladii";
-constexpr const char* kVersion = "0.1.0 prototype";
+// バージョン: X.Y.Z（X=大規模改修 / Y=機能追加 / Z=不具合修正）。VERSION・CHANGELOG.md と合わせて更新する
+constexpr const char* kVersion = "0.2.0";
 
 // ワールド単位: 1.0 = 約 1cm（キャラの身長 ≒ 170）
 constexpr float kWorldUnitPerMeter = 100.0f;

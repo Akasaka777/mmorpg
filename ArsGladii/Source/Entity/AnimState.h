@@ -11,6 +11,7 @@ enum class AnimState {
     Skill,
     Hit,
     Death,
+    Guard,   // 任意（未設定なら Idle を流用）
     Count
 };
 
@@ -23,10 +24,11 @@ inline const char* AnimStateKey(AnimState s)
     case AnimState::Skill:  return "skill";
     case AnimState::Hit:    return "hit";
     case AnimState::Death:  return "death";
+    case AnimState::Guard:  return "guard";
     default:                return "";
     }
 }
 
-inline bool AnimStateLoops(AnimState s) { return s == AnimState::Idle || s == AnimState::Move; }
+inline bool AnimStateLoops(AnimState s) { return s == AnimState::Idle || s == AnimState::Move || s == AnimState::Guard; }
 
 } // namespace ag

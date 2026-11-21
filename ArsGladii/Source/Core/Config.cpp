@@ -1,5 +1,6 @@
 #include "Config.h"
 #include "KeyValueFile.h"
+#include "Input.h"
 
 namespace ag {
 
@@ -20,6 +21,7 @@ bool GameSettings::Load(const char* path)
     seVolume          = kv.GetInt("se_volume", seVolume);
     showDamageNumbers = kv.GetBool("show_damage_numbers", showDamageNumbers);
     fullscreen        = kv.GetBool("fullscreen", fullscreen);
+    Input::Get().LoadBindings(kv);
     return true;
 }
 
@@ -33,6 +35,7 @@ bool GameSettings::Save(const char* path) const
     kv.SetInt("se_volume", seVolume);
     kv.SetBool("show_damage_numbers", showDamageNumbers);
     kv.SetBool("fullscreen", fullscreen);
+    Input::Get().SaveBindings(kv);
     return kv.Save(path);
 }
 

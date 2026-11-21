@@ -41,6 +41,7 @@ void Menu::Open()
 void Menu::Close()
 {
     open_ = false;
+    waitingKey_ = -1;
     if (settingsDirty_) {
         Settings().Save(kConfigPath);
         settingsDirty_ = false;
@@ -67,11 +68,12 @@ MenuCommand Menu::Run(Player& player, EventSink& events)
             selectedSlot_ = EquipSlot::None;
             scroll_ = 0;
             confirmQuit_ = false;
+            waitingKey_ = -1;
         }
     }
-    // Q/E でタブ切り替え
-    if (in.KeyPressed(KEY_INPUT_Q)) tab_ = static_cast<Tab>((static_cast<int>(tab_) + static_cast<int>(Tab::Count) - 1) % static_cast<int>(Tab::Count));
-    if (in.KeyPressed(KEY_INPUT_E)) tab_ = static_cast<Tab>((static_cast<int>(tab_) + 1) % static_cast<int>(Tab::Count));
+    // Q/E でタブ切り替え（キー設定の入力待ち中は無効）
+    if (waitingKey_ < 0 && in.KeyPressed(KEY_INPUT_Q)) tab_ = static_cast<Tab>((static_cast<int>(tab_) + static_cast<int>(Tab::Count) - 1) % static_cast<int>(Tab::Count));
+    if (waitingKey_ < 0 && in.KeyPressed(KEY_INPUT_E)) tab_ = static_cast<Tab>((static_cast<int>(tab_) + 1) % static_cast<int>(Tab::Count));
 
     if (ui::Button(x + w - 140, y + 24, 110, 46, "閉じる")) return MenuCommand::Close;
     DrawLine(x + 20, y + 90, x + w - 20, y + 90, ui::GoldDark(), 1);
@@ -402,21 +404,69 @@ void Menu::DrawSkillTab(Player& player, int x, int y, int w, int h)
 void Menu::DrawSettingsTab(int x, int y, int w, int h)
 {
     GameSettings& s = Settings();
-    ui::Panel(x, y, w, h, 160, false);
-    int ly = y + 40;
-    const int sw = 1100;
-    settingsDirty_ |= ui::Slider(x + 60, ly, sw, "マウス感度", s.mouseSensitivity, 0.2f, 3.0f, "%.2f"); ly += 70;
-    settingsDirty_ |= ui::Slider(x + 60, ly, sw, "カメラ距離", s.cameraDistance, 300.0f, 1400.0f, "%.0f"); ly += 70;
+    const int lw = 860;
+    ui::Panel(x, y, lw, h, 160, false);
+    FontManager::Get().Draw(x + 20, y + 14, "ゲーム設定", ui::Gold(), FontId::Medium);
+    int ly = y + 70;
+    const int sx = x + 30, sw = lw - 60;
+    settingsDirty_ |= ui::Slider(sx, ly, sw, "マウス感度", s.mouseSensitivity, 0.2f, 3.0f, "%.2f"); ly += 66;
+    settingsDirty_ |= ui::Slider(sx, ly, sw, "カメラ距離", s.cameraDistance, 300.0f, 1400.0f, "%.0f"); ly += 66;
     float bgm = static_cast<float>(s.bgmVolume), se = static_cast<float>(s.seVolume);
-    if (ui::Slider(x + 60, ly, sw, "BGM 音量", bgm, 0.0f, 100.0f, "%.0f")) { s.bgmVolume = static_cast<int>(bgm); SoundManager::Get().ApplyVolume(); settingsDirty_ = true; }
-    ly += 70;
-    if (ui::Slider(x + 60, ly, sw, "効果音 音量", se, 0.0f, 100.0f, "%.0f")) { s.seVolume = static_cast<int>(se); settingsDirty_ = true; }
-    ly += 80;
-    settingsDirty_ |= ui::Toggle(x + 60, ly, "カメラ上下反転", s.invertY); ly += 70;
-    settingsDirty_ |= ui::Toggle(x + 60, ly, "ダメージ数値表示", s.showDamageNumbers); ly += 70;
-    settingsDirty_ |= ui::Toggle(x + 60, ly, "フルスクリーン（次回起動時）", s.fullscreen); ly += 90;
-    FontManager::Get().Draw(x + 60, ly, Format("使用フォント: %s", FontManager::Get().FaceName().c_str()), ui::SubTextColor(), FontId::Small);
-    FontManager::Get().Draw(x + 60, ly + 30, "設定はメニューを閉じたときに save/config.ini へ保存されます。", ui::SubTextColor(), FontId::Small);
+    if (ui::Slider(sx, ly, sw, "BGM 音量", bgm, 0.0f, 100.0f, "%.0f")) { s.bgmVolume = static_cast<int>(bgm); SoundManager::Get().ApplyVolume(); settingsDirty_ = true; }
+    ly += 66;
+    if (ui::Slider(sx, ly, sw, "効果音 音量", se, 0.0f, 100.0f, "%.0f")) { s.seVolume = static_cast<int>(se); settingsDirty_ = true; }
+    ly += 76;
+    settingsDirty_ |= ui::Toggle(sx, ly, "カメラ上下反転", s.invertY); ly += 64;
+    settingsDirty_ |= ui::Toggle(sx, ly, "ダメージ数値表示", s.showDamageNumbers); ly += 64;
+    settingsDirty_ |= ui::Toggle(sx, ly, "フルスクリーン（次回起動時）", s.fullscreen); ly += 80;
+    FontManager::Get().Draw(sx, ly, Format("使用フォント: %s", FontManager::Get().FaceName().c_str()), ui::SubTextColor(), FontId::Small);
+    FontManager::Get().Draw(sx, ly + 30, "設定はメニューを閉じたときに save/config.ini へ保存されます。", ui::SubTextColor(), FontId::Small);
+
+    DrawKeyConfig(x + lw + 20, y, w - lw - 20, h);
+}
+
+void Menu::DrawKeyConfig(int x, int y, int w, int h)
+{
+    const FontManager& fm = FontManager::Get();
+    Input& in = Input::Get();
+    ui::Panel(x, y, w, h, 160, false);
+    fm.Draw(x + 20, y + 14, "キー配置", ui::Gold(), FontId::Medium);
+
+    // 入力待ち: 次に押されたキーを割り当てる（ESC でキャンセル）
+    if (waitingKey_ >= 0) {
+        const int code = in.DetectPressedKey();
+        if (code == KEY_INPUT_ESCAPE) {
+            waitingKey_ = -1;
+        } else if (code >= 0) {
+            in.Rebind(static_cast<Action>(waitingKey_), code);
+            waitingKey_ = -1;
+            settingsDirty_ = true;
+        }
+    }
+
+    const int rowH = 36;
+    int ry = y + 60;
+    for (int i = 0; i < static_cast<int>(Action::Count); ++i) {
+        const Action a = static_cast<Action>(i);
+        if (!Input::IsRebindable(a)) continue;
+        fm.Draw(x + 30, ry + 6, Input::ActionName(a), ui::TextColor(), FontId::Small);
+        const bool waiting = waitingKey_ == i;
+        const char* name = Input::KeyName(in.ActionKey(a));
+        const std::string label = waiting ? "キーを押してください" : (name ? name : "?");
+        if (ui::Button(x + 300, ry, w - 330, rowH - 6, label, waiting, true, FontId::Small)) waitingKey_ = i;
+        ry += rowH;
+    }
+    ry += 6;
+    fm.Draw(x + 30, ry, "通常攻撃・パリィ: 左クリック（固定）", ui::SubTextColor(), FontId::Small); ry += 28;
+    fm.Draw(x + 30, ry, "ガード: 右クリック長押し（固定）", ui::SubTextColor(), FontId::Small); ry += 28;
+    fm.Draw(x + 30, ry, "メニュー: ESC / 決定: Enter（固定）", ui::SubTextColor(), FontId::Small);
+    if (ui::Button(x + w - 250, y + 14, 220, 38, "初期設定に戻す", false, true, FontId::Small)) {
+        in.ResetBindings();
+        waitingKey_ = -1;
+        settingsDirty_ = true;
+    }
+    if (waitingKey_ >= 0) fm.DrawRight(x + w - 30, y + h - 34, "割り当てるキーを押してください（ESC でキャンセル）", GetColor(255, 220, 120), FontId::Small);
+    else fm.DrawRight(x + w - 30, y + h - 34, "他の操作と重なったキーは入れ替わります", ui::SubTextColor(), FontId::Small);
 }
 
 MenuCommand Menu::DrawSystemTab(int x, int y, int w, int h)
@@ -439,7 +489,7 @@ MenuCommand Menu::DrawSystemTab(int x, int y, int w, int h)
         if (ui::Button(bx, by + 30, 190, 56, "終了する")) cmd = MenuCommand::Quit;
         if (ui::Button(bx + 210, by + 30, 190, 56, "キャンセル")) confirmQuit_ = false;
     }
-    fm.DrawCentered(x + w / 2, y + h - 80, Format("%s  ver %s", kGameTitle, kVersion), ui::SubTextColor(), FontId::Small);
+    fm.DrawCentered(x + w / 2, y + h - 80, Format("%s  Ver. %s", kGameTitle, kVersion), ui::SubTextColor(), FontId::Small);
     fm.DrawCentered(x + w / 2, y + h - 50, Format("セーブファイル: %s", kSavePath), ui::SubTextColor(), FontId::Small);
     return cmd;
 }

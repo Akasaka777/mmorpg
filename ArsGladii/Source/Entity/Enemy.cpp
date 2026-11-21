@@ -44,10 +44,22 @@ float Enemy::WindupTime() const
     return t;
 }
 
-DamageResult Enemy::TakeDamage(const DamageResult& dmg)
+void Enemy::OnParried()
+{
+    if (ai_ == AI::Dead) return;
+    // パリィされると体勢を崩す（ボスも怯む）
+    telegraph_.active = false;
+    ai_ = AI::Stagger;
+    timer_ = IsBoss() ? 1.4f : 1.1f;
+    attackCd_ = std::max(attackCd_, def_->attackCooldown);
+    if (move_ == Move::Charge) chargeCd_ = 9.0f;
+    anim.Play(AnimState::Hit, timer_, true);
+}
+
+DamageResult Enemy::TakeDamage(const DamageResult& dmg, Character* attacker)
 {
     if (ai_ == AI::Dead) return DamageResult{};
-    DamageResult r = Character::TakeDamage(dmg);
+    DamageResult r = Character::TakeDamage(dmg, attacker);
     if (IsDead()) {
         ai_ = AI::Dead;
         deadTimer_ = 0.0f;
@@ -125,7 +137,8 @@ void Enemy::ResolveHit(Character& player, EventSink& events, float multiplier)
         inside = InArc(pos, yaw, player.pos, telegraph_.radius, telegraph_.halfArc, player.radius);
         break;
     case Telegraph::Shape::Circle:
-        inside = DistXZ(pos, player.pos) <= telegraph_.radius + player.radius;
+        // 叩きつけはジャンプで回避できる
+        inside = DistXZ(pos, player.pos) <= telegraph_.radius + player.radius && player.pos.y < 50.0f;
         break;
     case Telegraph::Shape::Line:
         inside = DistXZ(pos, player.pos) <= radius + player.radius + 20.0f;
@@ -134,13 +147,23 @@ void Enemy::ResolveHit(Character& player, EventSink& events, float multiplier)
     if (!inside || player.IsDead()) return;
 
     DamageResult dmg = CalcDamage(stats, player.stats, def_->attackMultiplier * multiplier);
-    DamageResult applied = player.TakeDamage(dmg);
+    DamageResult applied = player.TakeDamage(dmg, this);
+    if (applied.parried) {
+        OnParried();
+        GameEvent pe;
+        pe.type = GameEvent::Type::Parried;
+        pe.pos = VAdd(player.pos, VGet(0, player.Height() * 0.8f, 0));
+        pe.enemy = def_;
+        events.Push(pe);
+        return;
+    }
     if (applied.amount <= 0) return;
     GameEvent e;
+    e.critical = applied.critical;
     e.type = GameEvent::Type::DamageToPlayer;
     e.pos = VAdd(player.pos, VGet(0, player.Height(), 0));
     e.amount = applied.amount;
-    e.critical = applied.critical;
+    e.text = applied.guarded ? "guard" : "";
     events.Push(e);
 }
 

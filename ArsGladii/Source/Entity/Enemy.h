@@ -30,7 +30,8 @@ public:
     void Draw() const;
     void DrawTelegraph() const;
 
-    DamageResult TakeDamage(const DamageResult& dmg) override;
+    DamageResult TakeDamage(const DamageResult& dmg, Character* attacker = nullptr) override;
+    void OnParried() override;
 
     const EnemyDef& Def() const { return *def_; }
     int SpawnerIndex() const { return spawnerIndex_; }

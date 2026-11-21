@@ -83,7 +83,7 @@ void TitleScene::Draw()
     if (save_.exists && !save_.savedAt.empty())
         fm.DrawCentered(kScreenWidth / 2, by + 6, Format("最終セーブ: %s", save_.savedAt.c_str()), ui::SubTextColor(), FontId::Small);
 
-    fm.DrawRight(kScreenWidth - 30, kScreenHeight - 44, Format("ver %s", kVersion), ui::SubTextColor(), FontId::Small);
+    fm.DrawRight(kScreenWidth - 30, kScreenHeight - 44, Format("Ver. %s", kVersion), ui::SubTextColor(), FontId::Small);
     fm.Draw(30, kScreenHeight - 44, "W/S・↑↓: 選択   Enter: 決定   マウス操作可", ui::SubTextColor(), FontId::Small);
 }
 

@@ -20,6 +20,7 @@ struct GameEvent {
         BossEngaged,
         BossEnraged,
         PlayerDied,
+        Parried,     // パリィ成功
         Info,        // システムメッセージ（ログに表示）
         Warning,     // 画面中央に短く表示（MP不足など）
     };

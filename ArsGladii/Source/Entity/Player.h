@@ -1,7 +1,8 @@
 #pragma once
 // プレイヤーキャラクター
-//   ・WASD 移動（カメラ基準）/ Shift ダッシュ / Space 回避ステップ（無敵時間あり）
+//   ・WASD 移動（カメラ基準）/ Ctrl ダッシュ / Shift 回避ステップ（無敵時間あり）/ Space ジャンプ
 //   ・左クリック: 通常攻撃（3段コンボ。移動しながら出せるリアルタイム攻撃）
+//   ・右長押し: ガード（正面の攻撃を軽減）。ガード中、敵の攻撃が当たる瞬間に左クリックでパリィ
 //   ・1～4: ソードスキル（モーション固定・MP消費・クールダウン）
 //   ・R: クイックアイテム（回復薬）
 #include "Character.h"
@@ -19,14 +20,14 @@ class World;
 
 class Player : public Character {
 public:
-    enum class Action { Free, Attack, Skill, Dodge, Stagger, Dead };
+    enum class Action { Free, Attack, Skill, Dodge, Guard, Stagger, Dead };
 
     Player();
 
     void NewGame(const VECTOR& startPos);
     void Update(float dt, const Camera& cam, World& world, EventSink& events, bool inputEnabled);
     void Draw() const;
-    DamageResult TakeDamage(const DamageResult& dmg) override;
+    DamageResult TakeDamage(const DamageResult& dmg, Character* attacker = nullptr) override;
 
     // ステータス再計算（装備変更・レベルアップ・バフ時）
     void RecalcStats();
@@ -52,6 +53,12 @@ public:
     Action CurrentAction() const { return action_; }
     bool IsInvulnerable() const { return invulnTimer_ > 0.0f; }
     float DodgeCooldownRate() const { return dodgeCd_ / 0.8f; }
+    bool IsGuarding() const { return action_ == Action::Guard; }
+    bool IsParryWindow() const { return parryTimer_ > 0.0f; }
+    float ParryCooldownRate() const { return parryCd_ / 0.6f; }
+    float CounterTime() const { return counterTimer_; }
+    float AttackMultiplier() const { return counterTimer_ > 0.0f ? 1.5f : 1.0f; } // パリィ成功後のカウンター
+    bool IsAirborne() const { return pos.y > 0.5f || vy_ > 0.0f; }
 
     // ---- 保存対象データ ----
     std::string name = "プレイヤー";
@@ -87,6 +94,10 @@ private:
     VECTOR dodgeDir_ = VGet(0, 0, 1);
     float dodgeCd_ = 0.0f;
     float invulnTimer_ = 0.0f;
+    float vy_ = 0.0f;           // 垂直速度（ジャンプ）
+    float parryTimer_ = 0.0f;   // パリィ受付の残り時間
+    float parryCd_ = 0.0f;      // パリィ失敗後の再受付までの時間
+    float counterTimer_ = 0.0f; // パリィ成功後の与ダメージ上昇
     float hpRegenAcc_ = 0.0f;
     float mpRegenAcc_ = 0.0f;
 };

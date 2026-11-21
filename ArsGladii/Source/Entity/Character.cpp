@@ -3,7 +3,7 @@
 
 namespace ag {
 
-DamageResult Character::TakeDamage(const DamageResult& dmg)
+DamageResult Character::TakeDamage(const DamageResult& dmg, Character* /*attacker*/)
 {
     if (IsDead()) return DamageResult{};
     hp = std::max(0, hp - dmg.amount);

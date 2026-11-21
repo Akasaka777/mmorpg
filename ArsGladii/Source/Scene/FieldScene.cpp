@@ -97,7 +97,7 @@ void FieldScene::Update(float dt)
     if (result_.IsOpen()) {
         result_.Update(dt);
     } else if (menu_.IsOpen()) {
-        if (in.ActionPressed(Action::Menu)) menu_.Close();
+        if (in.ActionPressed(Action::Menu) && !menu_.IsCapturingKey()) menu_.Close();
     } else {
         if (in.ActionPressed(Action::Menu)) {
             in.SetMouseCaptured(false);
@@ -176,8 +176,18 @@ void FieldScene::ProcessEvents()
                                          e.critical ? GetColor(255, 220, 60) : GetColor(255, 255, 255), e.critical);
             break;
         case GameEvent::Type::DamageToPlayer:
-            if (numbers) floating_.Spawn(e.pos, Format("%d", e.amount), GetColor(255, 80, 80), e.critical);
-            camera_.AddShake(e.amount >= player_.stats.maxHP / 6 ? 14.0f : 6.0f, 0.25f);
+            if (e.text == "guard") {
+                if (numbers) floating_.Spawn(e.pos, Format("%d ガード", e.amount), GetColor(150, 190, 255), false);
+                camera_.AddShake(3.0f, 0.15f);
+            } else {
+                if (numbers) floating_.Spawn(e.pos, Format("%d", e.amount), GetColor(255, 80, 80), e.critical);
+                camera_.AddShake(e.amount >= player_.stats.maxHP / 6 ? 14.0f : 6.0f, 0.25f);
+            }
+            break;
+        case GameEvent::Type::Parried:
+            floating_.Spawn(e.pos, "PARRY!", GetColor(255, 230, 90), true);
+            hud_.ShowWarning("パリィ成功！ 2秒間 与ダメージ1.5倍");
+            camera_.AddShake(8.0f, 0.2f);
             break;
         case GameEvent::Type::PlayerHealed:
             floating_.Spawn(e.pos, Format("+%d", e.amount), GetColor(120, 255, 140), false);

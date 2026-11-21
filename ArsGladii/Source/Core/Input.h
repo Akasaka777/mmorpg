@@ -3,6 +3,8 @@
 // 将来のキーコンフィグ（設定画面での割り当て変更）に対応できるようにする。
 #include <array>
 
+namespace ag { class KeyValueFile; }
+
 namespace ag {
 
 enum class Action {
@@ -12,6 +14,7 @@ enum class Action {
     MoveRight,
     Dash,       // 押している間ダッシュ
     Dodge,      // 回避ステップ
+    Jump,       // ジャンプ
     Skill1,
     Skill2,
     Skill3,
@@ -40,6 +43,18 @@ public:
     bool ActionPressed(Action a) const;
     int  ActionKey(Action a) const { return bindings_[static_cast<int>(a)]; }
     void Bind(Action a, int keyCode) { bindings_[static_cast<int>(a)] = keyCode; }
+    // 同じキーが別の操作に割り当て済みなら入れ替える
+    void Rebind(Action a, int keyCode);
+    void ResetBindings();
+    void LoadBindings(const KeyValueFile& kv);
+    void SaveBindings(KeyValueFile& kv) const;
+
+    static const char* ActionName(Action a);   // 表示名（日本語）
+    static const char* ActionId(Action a);     // 保存用 ID
+    static bool IsRebindable(Action a);
+    static const char* KeyName(int keyCode);   // 表示用キー名（未対応は nullptr）
+    // このフレームで押された「名前のあるキー」を返す（無ければ -1）
+    int DetectPressedKey() const;
 
     bool MouseDown(MouseButton b) const;
     bool MousePressed(MouseButton b) const;

@@ -243,7 +243,6 @@ void Field::ResolveCollision(VECTOR& pos, float radius) const
     const float lim = def_->halfSize - radius;
     pos.x = Clamp(pos.x, -lim, lim);
     pos.z = Clamp(pos.z, -lim, lim);
-    pos.y = 0.0f;
 }
 
 bool Field::InTown(const VECTOR& p) const { return DistXZ(p, def_->townCenter) < def_->townRadius; }

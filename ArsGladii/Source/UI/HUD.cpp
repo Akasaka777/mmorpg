@@ -122,6 +122,8 @@ void HUD::DrawStatus(const Player& player) const
     };
     if (player.atkBuffTime > 0.0f) chip(Format("ATK↑ %.0fs", player.atkBuffTime), GetColor(255, 150, 90));
     if (player.defBuffTime > 0.0f) chip(Format("DEF↑ %.0fs", player.defBuffTime), GetColor(120, 200, 255));
+    if (player.CounterTime() > 0.0f) chip(Format("カウンター x1.5 %.1fs", player.CounterTime()), GetColor(255, 230, 90));
+    if (player.IsGuarding()) chip(player.IsParryWindow() ? "パリィ受付中" : "ガード中", player.IsParryWindow() ? GetColor(255, 230, 90) : GetColor(150, 190, 255));
     if (player.inTown) chip("安全地帯（回復量UP）", GetColor(140, 230, 160));
     const ItemInstance& w = player.equipment.Get(EquipSlot::Weapon);
     if (w.Valid() && w.IsBroken()) chip("武器破損", GetColor(255, 80, 80));
@@ -204,7 +206,8 @@ void HUD::DrawHotbar(const Player& player) const
     const int totalW = count * slot + (count - 1) * gap;
     int x = (kScreenWidth - totalW) / 2;
     const int y = kScreenHeight - slot - 36;
-    const char* keys[] = { "1", "2", "3", "4" };
+    auto keyName = [](Action a) { const char* n = Input::KeyName(Input::Get().ActionKey(a)); return std::string(n ? n : "?"); };
+    const std::string keys[] = { keyName(Action::Skill1), keyName(Action::Skill2), keyName(Action::Skill3), keyName(Action::Skill4) };
 
     auto drawSlot = [&](int sx, const std::string& key, const std::string& label, const std::string& sub,
                         float cdRate, float cdRemain, bool enabled, unsigned int accent) {
@@ -236,11 +239,11 @@ void HUD::DrawHotbar(const Player& player) const
         }
         x += slot + gap;
     }
-    drawSlot(x, "Space", "回避", "", player.DodgeCooldownRate(), 0.0f, true, GetColor(150, 150, 170));
+    drawSlot(x, keyName(Action::Dodge), "回避", "", player.DodgeCooldownRate(), 0.0f, true, GetColor(150, 150, 170));
     x += slot + gap;
     const ItemDef* q = ItemDatabase::Get().Find(player.quickItemId);
     const int n = player.inventory.CountOf(player.quickItemId);
-    drawSlot(x, "R", q ? q->name : "-", Format("x %d", n), 0.0f, 0.0f, n > 0, GetColor(90, 200, 120));
+    drawSlot(x, keyName(Action::UseItem), q ? q->name : "-", Format("x %d", n), 0.0f, 0.0f, n > 0, GetColor(90, 200, 120));
 
     // 武器種表示
     fm.DrawCentered(kScreenWidth / 2, y - 30, Format("武器: %s", GetWeaponTypeInfo(player.CurrentWeapon()).name), ui::SubTextColor(), FontId::Small, GetColor(0, 0, 0));
@@ -270,16 +273,20 @@ void HUD::DrawCenterTexts() const
 void HUD::DrawHelp() const
 {
     const FontManager& fm = FontManager::Get();
-    const char* lines[] = {
-        "WASD: 移動  Shift: ダッシュ  Space: 回避",
-        "左クリック: 通常攻撃（3段）  1～4: ソードスキル",
-        "右ドラッグ: カメラ  ホイール: ズーム  R: 回復薬",
-        "ESC: メニュー  F5: セーブ  F9: ロード  F1: ヘルプ表示切替",
+    auto k = [](Action a) { const char* n = Input::KeyName(Input::Get().ActionKey(a)); return n ? n : "?"; };
+    const std::string lines[] = {
+        Format("%s%s%s%s: 移動  %s: ダッシュ  %s: 回避  %s: ジャンプ", k(Action::MoveForward), k(Action::MoveLeft), k(Action::MoveBack), k(Action::MoveRight),
+               k(Action::Dash), k(Action::Dodge), k(Action::Jump)),
+        Format("左クリック: 攻撃  %s～%s: ソードスキル  %s: 回復薬", k(Action::Skill1), k(Action::Skill4), k(Action::UseItem)),
+        "右長押し: ガード  ガード中に攻撃の瞬間 左クリック: パリィ",
+        "マウス移動: 視点  ホイール: ズーム  Alt: カーソル表示",
+        Format("ESC: メニュー  %s: セーブ  %s: ロード  F1: ヘルプ切替", k(Action::QuickSave), k(Action::QuickLoad)),
     };
-    const int w = 560, h = 4 * 26 + 16;
+    const int n = 5;
+    const int w = 620, h = n * 26 + 16;
     const int x = kScreenWidth - w - 24, y = kScreenHeight - h - 24;
     ui::Panel(x, y, w, h, 140, false);
-    for (int i = 0; i < 4; ++i) fm.Draw(x + 12, y + 8 + i * 26, lines[i], ui::SubTextColor(), FontId::Small);
+    for (int i = 0; i < n; ++i) fm.Draw(x + 12, y + 8 + i * 26, lines[i], ui::SubTextColor(), FontId::Small);
 }
 
 } // namespace ag

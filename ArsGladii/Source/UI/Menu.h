@@ -17,6 +17,8 @@ public:
     void Open();
     void Close();
     bool IsOpen() const { return open_; }
+    // キー設定で入力待ち中（ESC でメニューを閉じない）
+    bool IsCapturingKey() const { return waitingKey_ >= 0; }
 
     // 入力処理と描画を同時に行う（即時モード UI）
     MenuCommand Run(Player& player, EventSink& events);
@@ -26,6 +28,7 @@ private:
     void DrawEquipmentTab(Player& player, EventSink& events, int x, int y, int w, int h);
     void DrawSkillTab(Player& player, int x, int y, int w, int h);
     void DrawSettingsTab(int x, int y, int w, int h);
+    void DrawKeyConfig(int x, int y, int w, int h);
     MenuCommand DrawSystemTab(int x, int y, int w, int h);
     void DrawItemDetail(Player& player, EventSink& events, const ItemInstance& item, int invIndex, EquipSlot equippedSlot, int x, int y, int w, int h);
 
@@ -38,6 +41,7 @@ private:
     std::string selectedSkill_;
     bool settingsDirty_ = false;
     bool confirmQuit_ = false;
+    int waitingKey_ = -1; // 入力待ち中の Action（-1: なし）
 };
 
 } // namespace ag
